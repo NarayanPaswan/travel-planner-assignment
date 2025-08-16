@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import 'package:intl/intl.dart';
 import '../../models/trip.dart';
@@ -7,6 +8,7 @@ import '../../models/expense.dart';
 
 import '../../services/segment_service.dart';
 import '../../services/expense_service.dart';
+import '../../providers/trips_provider.dart';
 
 import 'create_segment_screen.dart';
 import 'create_expense_screen.dart';
@@ -477,15 +479,27 @@ class _TripDetailScreenState extends State<TripDetailScreen>
                       ),
                     ),
                   ],
-                  onSelected: (value) {
-                    if (value == 'delete') {
+                  onSelected: (value) async {
+                    if (value == 'edit') {
+                      final result = await Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) => CreateExpenseScreen(
+                            tripId: widget.trip.id,
+                            expense: expense,
+                          ),
+                        ),
+                      );
+                      if (result == true) {
+                        // Refresh expenses after edit
+                        await _loadTripData();
+                      }
+                    } else if (value == 'delete') {
                       _showDeleteDialog(
                         'Delete Expense',
                         'Are you sure you want to delete this expense?',
                         () => _deleteExpense(expense.id),
                       );
                     }
-                    // TODO: Implement edit functionality
                   },
                 ),
               ],

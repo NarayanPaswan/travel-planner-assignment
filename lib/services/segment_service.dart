@@ -24,9 +24,13 @@ class SegmentService {
   // Create a new segment
   Future<TripSegment> createSegment(TripSegment segment) async {
     try {
+      // Create a copy of the segment data without the ID for new segments
+      final segmentData = segment.toJson();
+      segmentData.remove('id'); // Remove ID to let database generate it
+
       final response = await _supabase
           .from('trip_segments')
-          .insert(segment.toJson())
+          .insert(segmentData)
           .select()
           .single();
 
@@ -55,10 +59,7 @@ class SegmentService {
   // Delete a segment
   Future<void> deleteSegment(String segmentId) async {
     try {
-      await _supabase
-          .from('trip_segments')
-          .delete()
-          .eq('id', segmentId);
+      await _supabase.from('trip_segments').delete().eq('id', segmentId);
     } catch (e) {
       throw Exception('Failed to delete segment: $e');
     }
@@ -80,7 +81,10 @@ class SegmentService {
   }
 
   // Get segments by type for a specific trip
-  Future<List<TripSegment>> getSegmentsByType(String tripId, String type) async {
+  Future<List<TripSegment>> getSegmentsByType(
+    String tripId,
+    String type,
+  ) async {
     try {
       final response = await _supabase
           .from('trip_segments')

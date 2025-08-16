@@ -138,7 +138,9 @@ class _CreateSegmentScreenState extends State<CreateSegmentScreen> {
       if (user == null) throw Exception('User not authenticated');
 
       final segment = TripSegment(
-        id: widget.segment?.id ?? '',
+        id:
+            widget.segment?.id ??
+            '', // Empty string for new segments, will be ignored by service
         tripId: widget.tripId,
         userId: user.id,
         type: _selectedType,
