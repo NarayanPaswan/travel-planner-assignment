@@ -2,6 +2,69 @@
 
 A comprehensive travel planning application built with Flutter and Supabase backend, designed to help users plan, organize, and track their travel adventures.
 
+## 📱 User Guide
+
+### 1. Getting Started with the App
+
+#### First-time Setup
+1. Download and install the app
+2. Open the app - you'll see the splash screen
+3. Navigate to the registration screen (`auth/register_screen.dart`)
+4. Create an account using email and password
+5. Or use the login screen (`auth/login_screen.dart`) if you already have an account
+
+#### Home Screen Navigation
+After login, you'll be taken to the home screen (`home/home_screen.dart`) where you can:
+- View your upcoming trips
+- Access quick actions
+- See trip statistics
+
+### 2. Managing Your Profile
+- Go to Profile section (`profile/profile_screen.dart`)
+- Edit your profile details using Edit Profile (`profile/edit_profile_screen.dart`)
+- Update profile picture and personal information
+
+### 3. Planning Your Trips
+
+#### Creating a New Trip
+1. From the trips screen (`trips/trips_screen.dart`):
+   - Tap the '+' button
+   - Fill in trip details in create trip screen
+   - Add destination, dates, and description
+
+#### Managing Trip Segments
+1. In trip detail screen (`trips/trip_detail_screen.dart`):
+   - Add flight details
+   - Include hotel bookings
+   - Create activity itineraries
+   - View segment statistics
+
+#### Expense Tracking
+1. Use create expense screen (`trips/create_expense_screen.dart`) to:
+   - Add new expenses
+   - Categorize spending
+   - Track budget
+
+### 4. Special Features
+
+
+#### Data Security
+- All data is encrypted
+- Personal information is protected
+- Secure authentication system
+
+### 5. For Admin Users
+If you have admin access:
+1. Access admin dashboard (`admin/admin_dashboard_screen.dart`)
+2. Manage all trips (`admin/data_screen.dart`)
+3. Add new data (`admin/add_data_screen.dart`)
+
+### 6. Tips for Best Experience
+- Keep your trip segments organized
+- Update expenses regularly
+- Use the segment stats widget for insights
+- Back up important trip data
+
 ## ✨ Features
 
 ### 🎯 Core Functionality
