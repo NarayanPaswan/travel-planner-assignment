@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:provider/provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:io';
 import '../../providers/auth_provider.dart';
 import '../../services/auth_service.dart';
+import '../../services/storage_service.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -50,8 +53,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
     setState(() => _isUploadingAvatar = true);
     try {
-      final authService = AuthService();
-      final url = await authService.uploadAvatar(picked.path);
+      final storageService = StorageService();
+      String? url;
+
+      if (kIsWeb) {
+        final bytes = await picked.readAsBytes();
+        url = await storageService.uploadAvatarFromBytes(
+          bytes,
+          picked.name.split('.').last,
+        );
+      } else {
+        url = await storageService.uploadAvatar(File(picked.path));
+      }
       if (!mounted) return;
       if (url == null) {
         ScaffoldMessenger.of(
@@ -73,6 +86,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             : _fullNameController.text.trim(),
         avatarUrl: url,
       );
+
+      // Force refresh profile image cache
+      if (ok && mounted && url != null) {
+        final updatedUser = context.read<AuthProvider>().currentUser?.copyWith(
+          avatarUrl: '$url?${DateTime.now().millisecondsSinceEpoch}',
+        );
+        context.read<AuthProvider>().setCurrentUser(updatedUser);
+      }
       if (ok && mounted) {
         ScaffoldMessenger.of(
           context,

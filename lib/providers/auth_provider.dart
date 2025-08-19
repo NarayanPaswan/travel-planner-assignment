@@ -94,6 +94,11 @@ class AuthProvider extends ChangeNotifier {
   }
 
   // Update profile
+  void setCurrentUser(User? user) {
+    _currentUser = user;
+    notifyListeners();
+  }
+
   Future<bool> updateProfile({
     required String username,
     String? fullName,

@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 import '../../providers/trips_provider.dart';
 import '../../services/storage_service.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:typed_data';
 
 class CreateTripScreen extends StatefulWidget {
   const CreateTripScreen({super.key});
@@ -19,9 +21,23 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
   final _descriptionController = TextEditingController();
   DateTime? _startDate;
   DateTime? _endDate;
-  File? _selectedImage;
+  dynamic _selectedImage;
   bool _isLoading = false;
   final StorageService _storageService = StorageService();
+  bool _isImageLarge = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkImageSize();
+  }
+
+  void _checkImageSize() async {
+    final isLarge = await _isImageTooLarge();
+    setState(() {
+      _isImageLarge = isLarge;
+    });
+  }
 
   @override
   void dispose() {
@@ -56,77 +72,72 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
   }
 
   Future<void> _createTrip() async {
-    if (!_formKey.currentState!.validate()) return;
-    if (_startDate == null || _endDate == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select both start and end dates'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
-    }
+    if (_formKey.currentState!.validate()) {
+      setState(() => _isLoading = true);
+      try {
+        final storageService = StorageService();
+        String? imageUrl;
 
-    setState(() => _isLoading = true);
-
-    try {
-      String? tripImageUrl;
-
-      // Upload image if selected
-      if (_selectedImage != null) {
-        try {
-          // Generate a temporary trip ID for image upload
-          final tempTripId = DateTime.now().millisecondsSinceEpoch.toString();
-          tripImageUrl = await _storageService.uploadTripImage(
-            _selectedImage!,
-            tempTripId,
-          );
-        } catch (e) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Failed to upload image: $e'),
-                backgroundColor: Colors.orange,
-              ),
+        if (_selectedImage != null) {
+          if (_selectedImage is XFile) {
+            // For both web and mobile
+            final xFile = _selectedImage as XFile;
+            final bytes = await xFile.readAsBytes();
+            imageUrl = await storageService.uploadTripImageFromBytes(
+              bytes,
+              'new_trip',
+              xFile.name.split('.').last, // Get file extension
+            );
+          } else if (!kIsWeb && _selectedImage is File) {
+            // For mobile only
+            imageUrl = await storageService.uploadTripImage(
+              _selectedImage as File,
+              'new_trip',
             );
           }
-          // Continue without image if upload fails
         }
-      }
 
-      final success = await context.read<TripsProvider>().createTrip(
-        title: _titleController.text.trim(),
-        destination: _destinationController.text.trim(),
-        startDate: _startDate!,
-        endDate: _endDate!,
-        description: _descriptionController.text.trim().isEmpty
-            ? null
-            : _descriptionController.text.trim(),
-        tripImageUrl: tripImageUrl,
-      );
-
-      if (!mounted) return;
-
-      if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Trip created successfully!'),
-            backgroundColor: Colors.green,
-          ),
+        final success = await context.read<TripsProvider>().createTrip(
+          title: _titleController.text.trim(),
+          destination: _destinationController.text.trim(),
+          startDate: _startDate!,
+          endDate: _endDate!,
+          description: _descriptionController.text.trim().isEmpty
+              ? null
+              : _descriptionController.text.trim(),
+          tripImageUrl: imageUrl,
         );
-        Navigator.of(context).pop();
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              context.read<TripsProvider>().error ?? 'Failed to create trip',
+
+        if (!mounted) return;
+
+        if (success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Trip created successfully!'),
+              backgroundColor: Colors.green,
             ),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
+          );
+          Navigator.of(context).pop();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                context.read<TripsProvider>().error ?? 'Failed to create trip',
+              ),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error creating trip: $e'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+      } finally {
         setState(() => _isLoading = false);
       }
     }
@@ -143,9 +154,17 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
       );
 
       if (image != null) {
-        setState(() {
-          _selectedImage = File(image.path);
-        });
+        if (kIsWeb) {
+          // Web ke liye
+          setState(() {
+            _selectedImage = image;
+          });
+        } else {
+          // Mobile ke liye
+          setState(() {
+            _selectedImage = File(image.path);
+          });
+        }
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -218,10 +237,28 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
     return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
   }
 
-  bool _isImageTooLarge() {
+  Future<int> _getFileSize() async {
+    if (_selectedImage == null) return 0;
+    if (_selectedImage is XFile) {
+      return await (_selectedImage as XFile).length();
+    } else if (_selectedImage is File) {
+      return (_selectedImage as File).lengthSync();
+    }
+    return 0;
+  }
+
+  Future<bool> _isImageTooLarge() async {
     if (_selectedImage == null) return false;
     const maxSizeBytes = 1024 * 1024; // 1MB
-    return _selectedImage!.lengthSync() > maxSizeBytes;
+    if (_selectedImage is XFile) {
+      final xFile = _selectedImage as XFile;
+      final bytes = await xFile.length();
+      return bytes > maxSizeBytes;
+    } else if (_selectedImage is File) {
+      final file = _selectedImage as File;
+      return file.lengthSync() > maxSizeBytes;
+    }
+    return false;
   }
 
   @override
@@ -412,7 +449,15 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(8),
-                        child: Image.file(_selectedImage!, fit: BoxFit.cover),
+                        child: kIsWeb
+                            ? Image.network(
+                                _selectedImage.path,
+                                fit: BoxFit.cover,
+                              )
+                            : Image.file(
+                                File(_selectedImage.path),
+                                fit: BoxFit.cover,
+                              ),
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -420,24 +465,34 @@ class _CreateTripScreenState extends State<CreateTripScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          'File: ${_selectedImage!.path.split('/').last}',
+                          'File: ${_selectedImage.path.split('/').last}',
                           style: TextStyle(
                             fontSize: 12,
                             color: Colors.grey[600],
                             fontWeight: FontWeight.w500,
                           ),
                         ),
-                        Text(
-                          'Size: ${_formatFileSize(_selectedImage!.lengthSync())}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
-                            fontWeight: FontWeight.w500,
-                          ),
+                        FutureBuilder<int>(
+                          future: _getFileSize(),
+                          builder: (context, snapshot) {
+                            if (snapshot.connectionState ==
+                                ConnectionState.done) {
+                              return Text(
+                                'Size: ${_formatFileSize(snapshot.data ?? 0)}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[600],
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              );
+                            } else {
+                              return const Text('Calculating size...');
+                            }
+                          },
                         ),
                       ],
                     ),
-                    if (_isImageTooLarge()) ...[
+                    if (_isImageLarge) ...[
                       const SizedBox(height: 8),
                       Container(
                         padding: const EdgeInsets.all(8),

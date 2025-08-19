@@ -27,12 +27,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     setState(() => _isUploadingAvatar = true);
     try {
       final authService = AuthService();
-      final url = await authService.uploadAvatar(picked.path);
+      final url = await authService.uploadAvatar(picked);
       if (!mounted) return;
       if (url == null) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Failed to upload image')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to upload image')),
+        );
       } else {
         final authProvider = context.read<AuthProvider>();
         final currentName = authProvider.currentUser?.username ?? '';
@@ -54,9 +54,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
       }
     } finally {
       if (mounted) setState(() => _isUploadingAvatar = false);

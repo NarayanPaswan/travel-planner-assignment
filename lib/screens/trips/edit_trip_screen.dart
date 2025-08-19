@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+import 'dart:io';
 import '../../models/trip.dart';
 import '../../services/trip_service.dart';
+import '../../services/storage_service.dart';
 
 class EditTripScreen extends StatefulWidget {
   final Trip trip;
@@ -20,6 +23,7 @@ class _EditTripScreenState extends State<EditTripScreen> {
   final _descriptionController = TextEditingController();
   final TripService _tripService = TripService();
   final ImagePicker _picker = ImagePicker();
+  final StorageService _storageService = StorageService();
 
   DateTime _startDate = DateTime.now();
   DateTime _endDate = DateTime.now().add(const Duration(days: 1));
@@ -88,10 +92,21 @@ class _EditTripScreenState extends State<EditTripScreen> {
 
     setState(() => _isUploadingImage = true);
     try {
-      final url = await _tripService.uploadTripImage(
-        picked.path,
-        widget.trip.id,
-      );
+      String? url;
+
+      if (kIsWeb) {
+        final bytes = await picked.readAsBytes();
+        url = await _storageService.uploadTripImageFromBytes(
+          bytes,
+          widget.trip.id,
+          picked.name.split('.').last,
+        );
+      } else {
+        url = await _storageService.uploadTripImage(
+          File(picked.path),
+          widget.trip.id,
+        );
+      }
       if (mounted) {
         if (url != null) {
           setState(() => _newImageUrl = url);

@@ -1,15 +1,18 @@
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:path/path.dart' as path;
 import 'package:uuid/uuid.dart';
+import 'package:image_picker/image_picker.dart';
 
 class StorageService {
   final SupabaseClient _supabase = Supabase.instance.client;
   final _uuid = const Uuid();
-  static const String _bucketName = 'trip_images';
+  static const String _bucketName = 'trip_images'; // Use existing bucket
+  static const String _avatarFolder = 'avatars';
 
-  // Upload trip image
+  // Upload trip image from File (primarily for mobile)
   Future<String> uploadTripImage(File imageFile, String tripId) async {
     try {
       final user = _supabase.auth.currentUser;
@@ -31,7 +34,68 @@ class StorageService {
     }
   }
 
+  // Upload image from XFile (works for both web and mobile)
+  Future<String> uploadImageFromXFile(XFile pickedImage, String tripId) async {
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) throw Exception('No user logged in');
+
+      final fileExtension = path.extension(pickedImage.name);
+      final fileName = '${_uuid.v4()}$fileExtension';
+      final filePath = '${user.id}/$tripId/$fileName';
+
+      final bytes = await pickedImage.readAsBytes();
+      await _supabase.storage.from(_bucketName).uploadBinary(filePath, bytes);
+
+      final imageUrl = _supabase.storage
+          .from(_bucketName)
+          .getPublicUrl(filePath);
+
+      return imageUrl;
+    } catch (e) {
+      throw Exception('Failed to upload image: $e');
+    }
+  }
+
   // Upload trip image from bytes
+  Future<String> uploadAvatarFromBytes(
+    Uint8List imageBytes,
+    String fileExtension,
+  ) async {
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) throw Exception('No user logged in');
+
+      final fileName = '${_uuid.v4()}.$fileExtension';
+      final filePath = '$_avatarFolder/${user.id}/$fileName';
+
+      await _supabase.storage
+          .from(_bucketName)
+          .uploadBinary(filePath, imageBytes);
+
+      return _supabase.storage.from(_bucketName).getPublicUrl(filePath);
+    } catch (e) {
+      throw Exception('Failed to upload avatar: $e');
+    }
+  }
+
+  Future<String> uploadAvatar(File imageFile) async {
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) throw Exception('No user logged in');
+
+      final fileExtension = path.extension(imageFile.path);
+      final fileName = '${_uuid.v4()}$fileExtension';
+      final filePath = '$_avatarFolder/${user.id}/$fileName';
+
+      await _supabase.storage.from(_bucketName).upload(filePath, imageFile);
+
+      return _supabase.storage.from(_bucketName).getPublicUrl(filePath);
+    } catch (e) {
+      throw Exception('Failed to upload avatar: $e');
+    }
+  }
+
   Future<String> uploadTripImageFromBytes(
     Uint8List imageBytes,
     String tripId,
@@ -41,7 +105,7 @@ class StorageService {
       final user = _supabase.auth.currentUser;
       if (user == null) throw Exception('No user logged in');
 
-      final fileName = '${_uuid.v4()}$fileExtension';
+      final fileName = '${_uuid.v4()}.$fileExtension';
       final filePath = '${user.id}/$tripId/$fileName';
 
       await _supabase.storage

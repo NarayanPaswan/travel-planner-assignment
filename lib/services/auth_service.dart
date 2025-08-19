@@ -1,6 +1,9 @@
 import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart' hide User;
 import '../models/user.dart';
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:image_picker/image_picker.dart';
 
 class AuthService {
   final SupabaseClient _supabase = Supabase.instance.client;
@@ -135,15 +138,34 @@ class AuthService {
   }
 
   // Upload avatar image
-  Future<String?> uploadAvatar(String filePath) async {
+  Future<String?> uploadAvatar(dynamic fileSource) async {
     try {
       final user = _supabase.auth.currentUser;
       if (user == null) throw Exception('User not authenticated');
 
       final fileName = '${user.id}_${DateTime.now().millisecondsSinceEpoch}';
+      late Uint8List bytes;
+
+      if (kIsWeb) {
+        if (fileSource is XFile) {
+          bytes = await fileSource.readAsBytes();
+        } else {
+          throw Exception('Invalid file source for web');
+        }
+      } else {
+        if (fileSource is String) {
+          final file = File(fileSource);
+          bytes = await file.readAsBytes();
+        } else if (fileSource is XFile) {
+          bytes = await fileSource.readAsBytes();
+        } else {
+          throw Exception('Invalid file source for mobile');
+        }
+      }
+
       final response = await _supabase.storage
           .from('trip_images')
-          .upload('avatars/$fileName', File(filePath));
+          .uploadBinary('avatars/$fileName', bytes);
 
       if (response.isNotEmpty) {
         final url = _supabase.storage

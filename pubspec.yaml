@@ -43,7 +43,7 @@ dependencies:
   
   # Image handling
   image_picker: ^1.0.7
-  
+    
   # HTTP requests
   http: ^1.2.0
   
